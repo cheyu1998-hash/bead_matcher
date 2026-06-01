@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Bead Matcher{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">Bead Matcher</div>
+      <div style="padding:12px 20px;">
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">当前品牌</label>
+        <select id="global-brand" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:13px;">
+          <option value="Mard" selected>Mard</option>
+        </select>
+      </div>
+      <nav>
+        <a href="/inventory" class="{% if request.path == '/inventory' or request.path == '/' %}active{% endif %}">
+          <span class="icon">&#128230;</span> 库存管理
+        </a>
+        <a href="/chart" class="{% if request.path == '/chart' %}active{% endif %}">
+          <span class="icon">&#127912;</span> 色卡查看
+        </a>
+        <a href="/convert" class="{% if request.path == '/convert' %}active{% endif %}">
+          <span class="icon">&#128247;</span> 图片转图案
+        </a>
+        <a href="/patterns" class="{% if request.path == '/patterns' %}active{% endif %}">
+          <span class="icon">&#127912;</span> 图案库
+        </a>
+        <a href="/match" class="{% if request.path == '/match' %}active{% endif %}">
+          <span class="icon">&#9989;</span> 库存匹配
+        </a>
+      </nav>
+    </aside>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script>
+    async function api(url, opts={}) {
+      opts.headers = opts.headers || {};
+      if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+      }
+      try {
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = {ok: false, error: `服务器返回非 JSON: ${text.slice(0,200)}`}; }
+        if (!res.ok && data.ok === undefined) {
+          data.ok = false;
+          data.error = data.error || `HTTP ${res.status}`;
+        }
+        return data;
+      } catch (e) {
+        return {ok: false, error: `网络错误: ${e.message}`};
+      }
+    }
+
+    // 全局品牌选择器
+    let _globalBrands = [];
+    function getCurrentBrand() {
+      return localStorage.getItem('bead-brand') || 'Mard';
+    }
+    function setCurrentBrand(brand) {
+      localStorage.setItem('bead-brand', brand);
+      document.getElementById('global-brand').value = brand;
+      window.dispatchEvent(new Event('brandchange'));
+    }
+    async function initBrandSelector() {
+      const brands = await api('/api/brands');
+      _globalBrands = brands;
+      const sel = document.getElementById('global-brand');
+      sel.innerHTML = brands.map(b => `<option value="${b}" ${b === getCurrentBrand() ? 'selected' : ''}>${b}</option>`).join('');
+      sel.onchange = (e) => setCurrentBrand(e.target.value);
+    }
+    initBrandSelector();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

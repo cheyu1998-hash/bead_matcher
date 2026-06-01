@@ -1,0 +1,1314 @@
+{% extends "base.html" %}
+{% block title %}图案库 - Bead Matcher{% endblock %}
+{% block content %}
+<h1>图案库</h1>
+
+<div class="toolbar" style="margin-bottom:16px;">
+  <button class="btn btn-primary" onclick="showManualForm()">+ 手动录入图案</button>
+</div>
+
+<!-- 手动录入表单 -->
+<div class="card" id="manual-form-card" style="display:none; margin-bottom:24px;">
+  <h2>手动录入拼豆图案</h2>
+  <p class="hint">用于录入已有的拼豆图纸（非图片转换），只需填写色号用量即可。</p>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:2;">
+      <label>图案名称 <span class="required">*</span></label>
+      <input type="text" id="mp-name" placeholder="如 皮卡丘">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:2;">
+      <label>IP / 来源（可选）</label>
+      <div id="ip-tags" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+      <div style="margin-top:8px;">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="toggleTagManager()" style="font-size:12px;padding:4px 10px;">🏷️ 管理标签</button>
+      </div>
+      <div id="tag-manager-panel" style="display:none;margin-top:10px;padding:12px;background:#f8f9fa;border-radius:8px;">
+        <div style="font-size:12px;color:#666;margin-bottom:8px;">点击 × 删除标签（已关联图案的标签仅会从候选列表移除）</div>
+        <div id="tag-manager-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>品牌</label>
+      <select id="mp-brand"></select>
+    </div>
+    <div class="form-group">
+      <label>状态</label>
+      <select id="mp-status">
+        <option value="pending" selected>待制作</option>
+        <option value="done">已完成</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>宽（格子）</label>
+      <input type="number" id="mp-width" value="50" min="1">
+    </div>
+    <div class="form-group">
+      <label>高（格子）</label>
+      <input type="number" id="mp-height" value="50" min="1">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1;">
+      <label>色号选择 <span class="required">*</span></label>
+      <div id="color-picker" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1;">
+      <label>已选色号（按点击顺序，可用箭头调整）</label>
+      <div id="selected-colors-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:48px;padding:8px;background:#f5f7fa;border-radius:8px;align-items:center;">
+        <span style="color:#999;font-size:13px;">点击上方色块添加色号</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1;">
+      <label>色号用量</label>
+      <div id="qty-table-container" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1;">
+      <label>缩略图（可选，拖拽上传）</label>
+      <div id="thumb-dropzone" style="margin-top:8px;padding:32px;text-align:center;background:#f0f2f5;border:2px dashed #ccc;border-radius:8px;color:#888;cursor:pointer;">
+        拖拽图片到此处（支持从微信、文件管理器直接拖）
+      </div>
+      <input type="file" id="thumb-input" accept="image/*" style="display:none;">
+    </div>
+  </div>
+
+  <div class="form-actions" style="margin-top:16px;">
+    <button class="btn btn-primary" onclick="submitManual()">保存图案</button>
+    <button class="btn btn-secondary" onclick="hideManualForm()">取消</button>
+  </div>
+</div>
+
+<!-- 搜索与筛选 -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="form-row" style="margin:0;">
+    <div class="form-group" style="flex:2;">
+      <input type="text" id="search-input" placeholder="搜索图案名称..." style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;" oninput="loadPatterns()">
+    </div>
+    <div class="form-group">
+      <select id="filter-brand" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;" onchange="loadPatterns()">
+        <option value="">全部品牌</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <select id="filter-status" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;" onchange="loadPatterns()">
+        <option value="">全部状态</option>
+        <option value="pending">待制作</option>
+        <option value="done">已完成</option>
+      </select>
+    </div>
+    <div class="form-group" style="position:relative;">
+      <div id="filter-ip-trigger" onclick="toggleIpDropdown()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;cursor:pointer;user-select:none;display:flex;justify-content:space-between;align-items:center;">
+        <span id="filter-ip-label">全部来源</span>
+        <span style="font-size:10px;color:#999;">▼</span>
+      </div>
+      <div id="filter-ip-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;max-height:340px;overflow:hidden;">
+        <div style="padding:8px;border-bottom:1px solid #eee;">
+          <input type="text" id="filter-ip-search" placeholder="搜索来源..." style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;" oninput="onIpFilterSearch(this.value)">
+        </div>
+        <div id="filter-ip-options" style="max-height:200px;overflow-y:auto;padding:4px 0;"></div>
+        <div id="filter-ip-pagination" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid #eee;font-size:12px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 图案列表 -->
+<div class="card">
+  <h2>已保存的图案</h2>
+  <div id="patterns-list">
+    <div class="empty"><span class="icon">&#127912;</span>暂无图案</div>
+  </div>
+</div>
+
+<!-- 图片全屏查看 -->
+<div id="image-viewer" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:200;overflow:hidden;cursor:grab;">
+  <div id="viewer-toolbar" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:201;background:rgba(0,0,0,0.6);padding:8px 16px;border-radius:24px;color:#fff;font-size:13px;align-items:center;user-select:none;">
+    <button onclick="viewerZoom(-0.2)" style="background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;line-height:1;">-</button>
+    <span id="viewer-scale" style="min-width:50px;text-align:center;font-variant-numeric:tabular-nums;">100%</span>
+    <button onclick="viewerZoom(0.2)" style="background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;line-height:1;">+</button>
+    <button onclick="viewerReset()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;padding:4px 12px;border-radius:12px;cursor:pointer;font-size:12px;">适应</button>
+    <button onclick="closeImageViewer()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;padding:4px 12px;border-radius:12px;cursor:pointer;font-size:12px;">关闭</button>
+  </div>
+  <img id="viewer-img" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:none;max-height:none;transition:transform 0.1s ease-out;image-rendering:auto;will-change:transform;">
+</div>
+
+<!-- 图案详情弹窗 -->
+<div id="detail-modal" class="detail-modal-lg" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:32px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 id="detail-title" style="margin:0;">图案详情</h2>
+      <div id="detail-actions" style="display:flex;gap:8px;align-items:center;">
+        <button id="btn-edit" class="btn btn-sm btn-primary" onclick="enableEditMode()" style="display:none;">编辑</button>
+        <button onclick="closeDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+      </div>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedColors = []; // [{code, qty}] in click order
+let chartColors = [];
+let knownIps = [];
+let selectedIps = [];
+let showIpInput = false;
+let thumbnailFile = null;
+let savedPatternId = null; // for thumbnail upload after save
+
+// IP 筛选分页
+let allIpOptions = [];
+let ipFilterPage = 1;
+const IP_FILTER_PAGE_SIZE = 10;
+let selectedIpFilter = '';
+let ipFilterSearch = '';
+
+async function loadBrands() {
+  const brands = await api('/api/brands');
+  const sel = document.getElementById('mp-brand');
+  const current = getCurrentBrand();
+  sel.innerHTML = brands.map(b => `<option value="${b}" ${b === current ? 'selected' : ''}>${b}</option>`).join('');
+  sel.onchange = () => { setCurrentBrand(sel.value); loadChartColors(); };
+  await loadChartColors();
+
+  // 填充筛选下拉框
+  const filterBrand = document.getElementById('filter-brand');
+  const prevBrand = filterBrand.value;
+  filterBrand.innerHTML = '<option value="">全部品牌</option>' + brands.map(b => `<option value="${b}">${b}</option>`).join('');
+  if (prevBrand) filterBrand.value = prevBrand;
+}
+
+async function loadChartColors() {
+  const brand = document.getElementById('mp-brand').value || 'Mard';
+  const data = await api(`/api/chart/${brand}`);
+  chartColors = data.colors || [];
+  renderColorPicker();
+}
+
+async function loadKnownIps() {
+  knownIps = await api('/api/pattern-ips');
+  renderIpTags();
+
+  // 更新筛选下拉框数据
+  allIpOptions = [...knownIps];
+  ipFilterPage = 1;
+  renderIpFilterOptions();
+}
+
+// ---------- IP 筛选下拉框（分页） ----------
+
+function toggleIpDropdown() {
+  const dd = document.getElementById('filter-ip-dropdown');
+  if (!dd) return;
+  const showing = dd.style.display === 'block';
+  dd.style.display = showing ? 'none' : 'block';
+  if (!showing) renderIpFilterOptions();
+}
+
+function closeIpDropdown() {
+  const dd = document.getElementById('filter-ip-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+function onIpFilterSearch(val) {
+  ipFilterSearch = val.trim().toLowerCase();
+  ipFilterPage = 1;
+  renderIpFilterOptions();
+}
+
+function renderIpFilterOptions() {
+  const optionsContainer = document.getElementById('filter-ip-options');
+  const paginationContainer = document.getElementById('filter-ip-pagination');
+  const label = document.getElementById('filter-ip-label');
+  if (!optionsContainer || !paginationContainer) return;
+
+  // 过滤
+  let filtered = allIpOptions;
+  if (ipFilterSearch) {
+    filtered = allIpOptions.filter(ip => ip.toLowerCase().includes(ipFilterSearch));
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / IP_FILTER_PAGE_SIZE));
+  if (ipFilterPage > totalPages) ipFilterPage = totalPages;
+
+  // 渲染选项
+  let html = '';
+  // "全部来源" 选项
+  const allActive = selectedIpFilter === '' ? 'background:#e3f2fd;color:#1565c0;font-weight:600;' : '';
+  html += `<div onclick="selectIpFilter('')" style="padding:8px 12px;cursor:pointer;font-size:13px;${allActive}" onmouseover="this.style.background='#f5f7fa'" onmouseout="this.style.background='${selectedIpFilter === '' ? '#e3f2fd' : ''}'">全部来源</div>`;
+
+  const start = (ipFilterPage - 1) * IP_FILTER_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + IP_FILTER_PAGE_SIZE);
+  for (const ip of pageItems) {
+    const active = selectedIpFilter === ip ? 'background:#e3f2fd;color:#1565c0;font-weight:600;' : '';
+    html += `<div onclick="selectIpFilter('${ip}')" style="padding:8px 12px;cursor:pointer;font-size:13px;${active}" onmouseover="this.style.background='#f5f7fa'" onmouseout="this.style.background='${selectedIpFilter === ip ? '#e3f2fd' : ''}'">${ip}</div>`;
+  }
+
+  if (total === 0) {
+    html += '<div style="padding:12px;text-align:center;color:#999;font-size:13px;">无匹配标签</div>';
+  }
+
+  optionsContainer.innerHTML = html;
+
+  // 渲染分页
+  let pgHtml = '';
+  if (totalPages > 1) {
+    const prevStyle = ipFilterPage <= 1 ? 'padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;font-size:12px;opacity:0.5;cursor:not-allowed;' : 'padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;';
+    const nextStyle = ipFilterPage >= totalPages ? 'padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;font-size:12px;opacity:0.5;cursor:not-allowed;' : 'padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;';
+    pgHtml += `<button onclick="changeIpPage(-1)" ${ipFilterPage <= 1 ? 'disabled' : ''} style="${prevStyle}">上一页</button>`;
+    pgHtml += `<span>${ipFilterPage} / ${totalPages}</span>`;
+    pgHtml += `<button onclick="changeIpPage(1)" ${ipFilterPage >= totalPages ? 'disabled' : ''} style="${nextStyle}">下一页</button>`;
+  } else {
+    pgHtml = `<span style="color:#999;">共 ${total} 条</span>`;
+  }
+  paginationContainer.innerHTML = pgHtml;
+
+  // 更新 trigger 标签
+  if (label) label.textContent = selectedIpFilter || '全部来源';
+}
+
+function selectIpFilter(ip) {
+  selectedIpFilter = ip;
+  closeIpDropdown();
+  renderIpFilterOptions();
+  loadPatterns();
+}
+
+function changeIpPage(delta) {
+  ipFilterPage += delta;
+  renderIpFilterOptions();
+}
+
+// 点击外部关闭下拉
+document.addEventListener('click', e => {
+  const wrapper = document.getElementById('filter-ip-trigger');
+  const dd = document.getElementById('filter-ip-dropdown');
+  if (wrapper && dd && !wrapper.contains(e.target) && !dd.contains(e.target)) {
+    closeIpDropdown();
+  }
+});
+
+function renderIpTags() {
+  const container = document.getElementById('ip-tags');
+  let html = '';
+  for (const ip of knownIps) {
+    const active = selectedIps.includes(ip) ? 'active' : '';
+    html += `<button type="button" class="ip-tag ${active}" onclick="toggleIp('${ip}')">${ip}</button>`;
+  }
+  html += `<button type="button" class="ip-tag add" onclick="toggleIpInput()">+</button>`;
+  if (showIpInput) {
+    html += `<input type="text" id="ip-input-inline" placeholder="输入新标签，回车确认" style="width:140px;padding:4px 10px;border:1px solid #4f8cff;border-radius:12px;font-size:13px;" onkeydown="if(event.key==='Enter')confirmNewIp()">`;
+  }
+  container.innerHTML = html;
+  if (showIpInput) {
+    setTimeout(() => {
+      const input = document.getElementById('ip-input-inline');
+      if (input) input.focus();
+    }, 10);
+  }
+}
+
+function toggleIp(ip) {
+  if (selectedIps.includes(ip)) {
+    selectedIps = selectedIps.filter(i => i !== ip);
+  } else {
+    selectedIps.push(ip);
+  }
+  renderIpTags();
+}
+
+function toggleIpInput() {
+  showIpInput = !showIpInput;
+  renderIpTags();
+}
+
+function toggleTagManager() {
+  const panel = document.getElementById('tag-manager-panel');
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) renderTagManager();
+}
+
+function renderTagManager() {
+  const container = document.getElementById('tag-manager-list');
+  if (knownIps.length === 0) {
+    container.innerHTML = '<span style="color:#999;font-size:12px;">暂无标签</span>';
+    return;
+  }
+  let html = '';
+  for (const ip of knownIps) {
+    html += `
+      <div style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e3f2fd;color:#1565c0;border-radius:14px;font-size:13px;">
+        ${ip}
+        <button type="button" onclick="deleteTag('${ip}')" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:14px;line-height:1;">×</button>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+async function deleteTag(name) {
+  if (!confirm(`确定删除标签 "${name}" 吗？`)) return;
+  await api(`/api/pattern-ips/${encodeURIComponent(name)}`, {method: 'DELETE'});
+  knownIps = knownIps.filter(ip => ip !== name);
+  selectedIps = selectedIps.filter(ip => ip !== name);
+  renderIpTags();
+  renderTagManager();
+}
+
+async function confirmNewIp() {
+  const input = document.getElementById('ip-input-inline');
+  if (!input) return;
+  const text = input.value.trim();
+  if (text) {
+    if (!knownIps.includes(text)) {
+      knownIps.push(text);
+      // 持久化到标签库
+      await api('/api/pattern-ips', {method: 'POST', body: {name: text}});
+    }
+    if (!selectedIps.includes(text)) selectedIps.push(text);
+  }
+  showIpInput = false;
+  renderIpTags();
+}
+
+function getPrefix(code) {
+  if (code.startsWith('ZG')) return 'ZG';
+  if (code.startsWith('IC')) return 'IC';
+  if (code.startsWith('DH')) return 'DH';
+  if (code.startsWith('YX')) return 'YX';
+  return code[0] || '';
+}
+
+function renderColorPicker() {
+  const groups = {};
+  for (const c of chartColors) {
+    const prefix = getPrefix(c.code);
+    if (!groups[prefix]) groups[prefix] = [];
+    groups[prefix].push(c);
+  }
+
+  let html = '';
+  for (const prefix of Object.keys(groups).sort((a,b) => a.localeCompare(b))) {
+    const colors = groups[prefix];
+    const prefixName = {A:'Yellow',B:'Green',C:'Blue',D:'Purple',E:'Pink',F:'Red',G:'Brown',H:'Grey',M:'Muted',P:'Pastel',Q:'Fluorescent',R:'Special',T:'White',Y:'Soft',ZG:'Vintage',IC:'Ice',DH:'Dark',YX:'Metallic'}[prefix] || prefix;
+    html += `<div style="margin-bottom:10px;"><div style="font-size:12px;color:#666;margin-bottom:4px;">${prefix} 系列 <span style="color:#999;">(${prefixName})</span></div>`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:4px;">`;
+    for (const c of colors) {
+      const selected = selectedColors.find(s => s.code === c.code);
+      const border = selected ? '2px solid #333' : '2px solid transparent';
+      const textColor = isDark(c.hex) ? '#fff' : '#333';
+      html += `<div class="color-swatch-btn" style="width:48px;height:28px;background:${c.hex};border-radius:4px;cursor:pointer;border:${border};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:${textColor};"
+           title="${c.code} ${c.name}" onclick="toggleColor('${c.code}')">${c.code}</div>`;
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById('color-picker').innerHTML = html;
+}
+
+function isDark(hex) {
+  if (!hex || hex.length < 7) return false;
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return (r*299 + g*587 + b*114) / 1000 < 128;
+}
+
+function toggleColor(code) {
+  const idx = selectedColors.findIndex(s => s.code === code);
+  if (idx >= 0) {
+    selectedColors.splice(idx, 1);
+  } else {
+    selectedColors.push({code, qty: 100});
+  }
+  renderColorPicker();
+  renderSelectedRow();
+  renderQtyTable();
+}
+
+function renderSelectedRow() {
+  const container = document.getElementById('selected-colors-row');
+  if (selectedColors.length === 0) {
+    container.innerHTML = '<span style="color:#999;font-size:13px;">点击上方色块添加色号</span>';
+    return;
+  }
+
+  const colorMap = {};
+  for (const c of chartColors) colorMap[c.code] = c;
+
+  let html = '';
+  for (let i = 0; i < selectedColors.length; i++) {
+    const s = selectedColors[i];
+    const c = colorMap[s.code];
+    html += `<div style="display:flex;align-items:center;gap:2px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:4px 6px;">`;
+    html += `<div style="width:14px;height:14px;background:${c ? c.hex : '#ccc'};border-radius:3px;border:1px solid #ccc;"></div>`;
+    html += `<span style="font-size:11px;font-weight:bold;">${s.code}</span>`;
+    html += `<button type="button" onclick="moveColor(${i}, -1)" ${i === 0 ? 'disabled' : ''} style="font-size:9px;padding:0 2px;">◀</button>`;
+    html += `<button type="button" onclick="moveColor(${i}, 1)" ${i === selectedColors.length-1 ? 'disabled' : ''} style="font-size:9px;padding:0 2px;">▶</button>`;
+    html += `<button type="button" onclick="removeColor('${s.code}')" style="font-size:11px;color:#f44;padding:0 2px;background:none;border:none;cursor:pointer;">×</button>`;
+    html += `</div>`;
+  }
+  container.innerHTML = html;
+}
+
+function moveColor(idx, delta) {
+  const newIdx = idx + delta;
+  if (newIdx >= 0 && newIdx < selectedColors.length) {
+    [selectedColors[idx], selectedColors[newIdx]] = [selectedColors[newIdx], selectedColors[idx]];
+    renderSelectedRow();
+    renderQtyTable();
+  }
+}
+
+function removeColor(code) {
+  selectedColors = selectedColors.filter(s => s.code !== code);
+  renderColorPicker();
+  renderSelectedRow();
+  renderQtyTable();
+}
+
+function renderQtyTable() {
+  const container = document.getElementById('qty-table-container');
+  if (selectedColors.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  const colorMap = {};
+  for (const c of chartColors) colorMap[c.code] = c;
+
+  let html = '<table><thead><tr><th>色号</th><th>名称</th><th>色样</th><th>数量</th></tr></thead><tbody>';
+  for (let i = 0; i < selectedColors.length; i++) {
+    const s = selectedColors[i];
+    const c = colorMap[s.code];
+    html += `<tr>
+      <td><b>${s.code}</b></td>
+      <td>${c ? c.name : '未知'}</td>
+      <td><span class="color-dot" style="background:${c ? c.hex : '#ccc'}"></span></td>
+      <td><input type="number" min="1" value="${s.qty}" onchange="updateQty('${s.code}', this.value)" style="width:80px;padding:6px;"></td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function updateQty(code, qty) {
+  const s = selectedColors.find(s => s.code === code);
+  if (s) s.qty = Math.max(1, parseInt(qty) || 1);
+}
+
+function showManualForm() {
+  document.getElementById('manual-form-card').style.display = 'block';
+  selectedColors = [];
+  selectedIps = [];
+  showIpInput = false;
+  thumbnailFile = null;
+  savedPatternId = null;
+  renderColorPicker();
+  renderSelectedRow();
+  renderQtyTable();
+  renderIpTags();
+  resetThumbDropzone();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function hideManualForm() {
+  document.getElementById('manual-form-card').style.display = 'none';
+}
+
+function resetThumbDropzone() {
+  const dz = document.getElementById('thumb-dropzone');
+  dz.textContent = '拖拽图片到此处（支持从微信、文件管理器直接拖）';
+  dz.style.background = '#f0f2f5';
+  dz.style.borderColor = '#ccc';
+  dz.style.color = '#888';
+}
+
+function setThumbDropped(file) {
+  thumbnailFile = file;
+  const dz = document.getElementById('thumb-dropzone');
+  dz.textContent = `已接收: ${file.name}`;
+  dz.style.background = '#e8f5e9';
+  dz.style.borderColor = '#4caf50';
+  dz.style.color = '#2e7d32';
+}
+
+// Drag & drop for thumbnail
+const dropzone = document.getElementById('thumb-dropzone');
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.style.borderColor = '#4f8cff'; });
+dropzone.addEventListener('dragleave', e => { e.preventDefault(); dropzone.style.borderColor = '#ccc'; });
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.style.borderColor = '#ccc';
+  const files = e.dataTransfer.files;
+  if (files.length > 0) setThumbDropped(files[0]);
+});
+dropzone.addEventListener('click', () => document.getElementById('thumb-input').click());
+document.getElementById('thumb-input').addEventListener('change', e => {
+  if (e.target.files.length > 0) setThumbDropped(e.target.files[0]);
+});
+
+async function submitManual() {
+  const name = document.getElementById('mp-name').value.trim();
+  if (!name) { alert('请输入图案名称'); return; }
+  if (selectedColors.length === 0) { alert('请至少选择一个色号'); return; }
+
+  const color_usage = {};
+  for (const s of selectedColors) color_usage[s.code] = s.qty;
+
+  const payload = {
+    name: name,
+    ip_name: selectedIps.length > 0 ? selectedIps : [],
+    brand: document.getElementById('mp-brand').value,
+    status: document.getElementById('mp-status').value,
+    width: parseInt(document.getElementById('mp-width').value) || 50,
+    height: parseInt(document.getElementById('mp-height').value) || 50,
+    tags: [],
+    color_usage: color_usage,
+  };
+
+  const res = await api('/api/patterns/manual', { method: 'POST', body: payload });
+
+  if (res.ok) {
+    savedPatternId = res.pattern.id;
+    // Upload thumbnail if any
+    if (thumbnailFile && savedPatternId) {
+      const form = new FormData();
+      form.append('image', thumbnailFile);
+      try {
+        await fetch(`/api/patterns/${savedPatternId}/thumbnail`, {method: 'POST', body: form});
+      } catch (e) {
+        console.warn('缩略图上传失败:', e);
+      }
+    }
+    hideManualForm();
+    loadPatterns();
+  } else {
+    alert(res.error || '保存失败');
+  }
+}
+
+async function loadPatterns() {
+  const params = new URLSearchParams();
+  const search = document.getElementById('search-input').value.trim();
+  if (search) params.set('search', search);
+  const brand = document.getElementById('filter-brand').value;
+  if (brand) params.set('brand', brand);
+  const status = document.getElementById('filter-status').value;
+  if (status) params.set('status', status);
+  if (selectedIpFilter) params.set('ip', selectedIpFilter);
+
+  const url = '/api/patterns' + (params.toString() ? '?' + params.toString() : '');
+  const patterns = await api(url);
+  if (patterns.length === 0) {
+    document.getElementById('patterns-list').innerHTML = '<div class="empty"><span class="icon">&#127912;</span>暂无图案</div>';
+    return;
+  }
+
+  const cards = patterns.map(p => {
+    const sizeText = (p.width && p.height) ? `${p.width}×${p.height}` : '-';
+    const ipTags = (p.ip_name || []).map(ip => `<span class="tag tag-info" style="font-size:11px;padding:1px 6px;margin-right:4px;">${ip}</span>`).join('');
+    return `
+      <div class="pattern-card">
+        <div class="pattern-card-img" onclick="showDetail('${p.id}')">
+          <img src="/thumbnails/${p.id}.png" alt="${p.name}" loading="lazy"
+               onerror="this.style.display='none';this.parentElement.classList.add('empty');">
+        </div>
+        <div class="pattern-card-info" onclick="showDetail('${p.id}')" style="cursor:pointer;">
+          <div class="name">${p.name}</div>
+          <div class="meta">${sizeText} · ${p.total_beads} 粒 · ${p.colors} 色</div>
+          ${ipTags ? `<div style="margin-top:6px;">${ipTags}</div>` : ''}
+        </div>
+        <div style="padding:0 16px 12px;text-align:right;">
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deletePattern('${p.id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('patterns-list').innerHTML = `<div class="pattern-grid">${cards}</div>`;
+}
+
+function renderColorBarChart(colorUsage) {
+  if (!colorUsage || colorUsage.length === 0) return '';
+  const sorted = [...colorUsage].sort((a, b) => b.count - a.count);
+  const maxCount = sorted[0].count;
+
+  let html = '<div class="color-bar-chart">';
+  for (const c of sorted) {
+    const pct = maxCount > 0 ? (c.count / maxCount * 100).toFixed(1) : '0';
+    html += `
+      <div class="color-bar">
+        <div class="color-bar-swatch" style="background:${c.hex || '#ccc'};" title="${c.code} ${c.name}"></div>
+        <div style="min-width:50px;font-weight:600;">${c.code}</div>
+        <div class="color-bar-track">
+          <div class="color-bar-fill" style="width:${pct}%;background:${c.hex || '#ccc'};"></div>
+        </div>
+        <div class="color-bar-count">${c.count}</div>
+      </div>
+    `;
+  }
+  html += '</div>';
+  return html;
+}
+
+let currentPattern = null;
+
+async function showDetail(patternId) {
+  const p = await api(`/api/patterns/${patternId}`);
+  if (!p || p.ok === false) return;
+  currentPattern = p;
+  renderDetailView(p);
+  document.getElementById('btn-edit').style.display = 'inline-flex';
+  document.getElementById('detail-modal').style.display = 'flex';
+  loadMakeHistory(patternId);
+}
+
+function renderDetailView(p) {
+  const statusText = p.status === 'done' ? '已完成' : '待制作';
+  const statusClass = p.status === 'done' ? 'tag-success' : 'tag-warn';
+  const ipTags = (p.ip_name || []).map(ip => `<span class="tag tag-info">${ip}</span>`).join(' ');
+
+  // 左侧视图切换区
+  const hasGrid = p.grid && Object.keys(p.grid).length > 0;
+  let leftHtml = `
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <button id="btn-view-image" class="btn btn-sm btn-primary" onclick="showDetailImage()" style="font-size:12px;">原图</button>
+      ${hasGrid ? `<button id="btn-view-grid" class="btn btn-sm btn-secondary" onclick="showDetailGrid()" style="font-size:12px;">格子视图</button>
+        <a href="/api/patterns/${p.id}/grid.png?cell_size=24&show_code=1" download="${p.name}_grid.png" class="btn btn-sm btn-secondary" style="font-size:12px;text-decoration:none;">下载格子图</a>` : ''}
+    </div>
+    <div id="detail-image-view">
+      <img class="big-image" id="d-img1" src="/images/${p.id}.png" alt="${p.name}"
+           onerror="document.getElementById('d-img1').style.display='none';document.getElementById('d-img2').style.display='block';"
+           onclick="openImageViewer('/images/${p.id}.png')" style="cursor:zoom-in;"
+      >
+      <img class="big-image" id="d-img2" src="/thumbnails/${p.id}.png" style="display:none;"
+           onerror="document.getElementById('d-img2').style.display='none';document.getElementById('d-empty').style.display='block';"
+           onclick="openImageViewer('/thumbnails/${p.id}.png')" style="cursor:zoom-in;"
+      >
+      <div id="d-empty" style="display:none;">
+        <div class="empty-image"></div>
+        ${renderColorBarChart(p.color_usage)}
+      </div>
+    </div>
+    <div id="detail-grid-view" style="display:none;"></div>
+  `;
+
+  // 右侧色号列表（按用量降序）
+  const sortedColors = [...p.color_usage].sort((a, b) => b.count - a.count);
+  let colorListHtml = '';
+  for (const c of sortedColors) {
+    colorListHtml += `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:6px;margin-bottom:6px;">
+        <div style="width:28px;height:28px;background:${c.hex || '#ccc'};border-radius:4px;border:1px solid #ddd;"></div>
+        <div style="flex:1;">
+          <div style="font-weight:bold;font-size:14px;">${c.code}</div>
+          <div style="font-size:12px;color:#666;">${c.name}</div>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:#333;">${c.count} 粒</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('detail-title').innerHTML = `${p.name} ${ipTags}`;
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <span class="tag ${statusClass}">${statusText}</span>
+      <span class="tag tag-info">${p.brand}</span>
+      <span class="tag tag-info">${p.width}×${p.height}</span>
+      <span class="tag tag-info">${p.total_beads} 粒</span>
+      <span class="tag tag-info">${p.color_usage.length} 色</span>
+    </div>
+    <div class="detail-body">
+      <div class="detail-left">
+        ${leftHtml}
+      </div>
+      <div class="detail-right color-list-scroll">
+        <h3 style="font-size:14px;margin-bottom:10px;color:#555;">色号用量</h3>
+        ${colorListHtml}
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:16px;background:#f8f9fa;border-radius:8px;">
+      <h3 style="font-size:14px;margin-bottom:10px;color:#555;">制作记录</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="number" id="make-copies" value="1" min="1" style="width:60px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+        <span style="font-size:13px;color:#666;">份</span>
+        <button class="btn btn-primary btn-sm" onclick="submitMake()">已制作，提交</button>
+      </div>
+      <div id="make-msg" style="margin-top:8px;font-size:12px;"></div>
+      <div id="make-history" style="margin-top:12px;"></div>
+    </div>
+  `;
+}
+
+function showDetailImage() {
+  const imgView = document.getElementById('detail-image-view');
+  const gridView = document.getElementById('detail-grid-view');
+  const btnImg = document.getElementById('btn-view-image');
+  const btnGrid = document.getElementById('btn-view-grid');
+  if (imgView) imgView.style.display = 'block';
+  if (gridView) gridView.style.display = 'none';
+  if (btnImg) { btnImg.className = 'btn btn-sm btn-primary'; btnImg.style.fontSize = '12px'; }
+  if (btnGrid) { btnGrid.className = 'btn btn-sm btn-secondary'; btnGrid.style.fontSize = '12px'; }
+}
+
+function showDetailGrid() {
+  if (!currentPattern) return;
+  const imgView = document.getElementById('detail-image-view');
+  const gridView = document.getElementById('detail-grid-view');
+  const btnImg = document.getElementById('btn-view-image');
+  const btnGrid = document.getElementById('btn-view-grid');
+  if (imgView) imgView.style.display = 'none';
+  if (gridView) {
+    gridView.style.display = 'block';
+    renderDetailGrid(currentPattern);
+  }
+  if (btnImg) { btnImg.className = 'btn btn-sm btn-secondary'; btnImg.style.fontSize = '12px'; }
+  if (btnGrid) { btnGrid.className = 'btn btn-sm btn-primary'; btnGrid.style.fontSize = '12px'; }
+}
+
+async function submitMake() {
+  if (!currentPattern) return;
+  const copies = parseInt(document.getElementById('make-copies').value) || 1;
+  const msgEl = document.getElementById('make-msg');
+  msgEl.innerHTML = '';
+
+  const res = await api(`/api/patterns/${currentPattern.id}/make`, {
+    method: 'POST',
+    body: { copies },
+  });
+
+  if (res.ok) {
+    msgEl.innerHTML = `<span style="color:#2e7d32;">✓ 制作记录已保存，库存已扣除</span>`;
+    loadMakeHistory(currentPattern.id);
+    setTimeout(() => msgEl.innerHTML = '', 3000);
+  } else {
+    msgEl.innerHTML = `<span style="color:#c62828;">✗ ${res.error || '制作失败'}</span>`;
+  }
+}
+
+async function loadMakeHistory(patternId) {
+  const container = document.getElementById('make-history');
+  if (!container) return;
+  const records = await api(`/api/patterns/${patternId}/makes`);
+  if (!records || records.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:#999;">暂无制作记录</div>';
+    return;
+  }
+  let html = '<div style="max-height:160px;overflow-y:auto;">';
+  for (const r of records) {
+    const date = new Date(r.made_at).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+    const copies = (r.consumed && r.consumed.__copies__) ? r.consumed.__copies__ : 1;
+    const statusText = r.status === 'undone' ? '<span style="color:#999;">（已撤销）</span>' : '';
+    const undoBtn = r.status !== 'undone'
+      ? `<button class="btn btn-sm btn-danger" onclick="undoMake(${r.id})" style="font-size:11px;padding:2px 8px;">撤销</button>`
+      : '';
+    html += `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;font-size:12px;">
+        <span>${date} · ${copies}份 ${statusText}</span>
+        ${undoBtn}
+      </div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+async function undoMake(recordId) {
+  if (!confirm('确定撤销这条制作记录吗？库存将恢复。')) return;
+  const res = await api(`/api/makes/${recordId}/undo`, {method: 'POST'});
+  if (res.ok) {
+    loadMakeHistory(currentPattern.id);
+  } else {
+    alert(res.error || '撤销失败');
+  }
+}
+
+let gridZoomScale = 1;
+
+function renderDetailGrid(p) {
+  const container = document.getElementById('detail-grid-view');
+  if (!container) return;
+  if (!p.grid || Object.keys(p.grid).length === 0) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#999;font-size:14px;">该图案无网格数据，无法显示格子视图</div>';
+    return;
+  }
+
+  const colorMap = {};
+  for (const c of p.color_usage) colorMap[c.code] = c;
+
+  // 默认让 grid 总宽度约 480px，但每个格子至少 12px 才能显示色号代码
+  const baseCellSize = Math.max(12, Math.min(22, Math.floor(480 / p.width)));
+  const fontSize = baseCellSize <= 14 ? 7 : 9;
+
+  let gridHtml = `<div id="detail-grid-inner" style="display:grid;grid-template-columns:repeat(${p.width}, ${baseCellSize}px);gap:1px;background:#999;width:fit-content;border:1px solid #999;transform-origin:top left;">`;
+  for (let r = 0; r < p.height; r++) {
+    for (let c = 0; c < p.width; c++) {
+      const code = p.grid[`${c},${r}`];
+      const color = colorMap[code];
+      const hex = color ? color.hex : '#ccc';
+      const textColor = isDark(hex) ? '#fff' : '#333';
+      const label = code || '';
+      const name = color ? color.name : '';
+      gridHtml += `<div style="width:${baseCellSize}px;height:${baseCellSize}px;background:${hex};display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;color:${textColor};font-family:monospace;line-height:1;" title="${code || ''} ${name}">${label}</div>`;
+    }
+  }
+  gridHtml += '</div>';
+
+  // 色卡图例
+  const sortedColors = [...p.color_usage].sort((a, b) => b.count - a.count);
+  let legendHtml = '<div style="margin-top:16px;"><h4 style="font-size:13px;margin-bottom:8px;color:#555;">色卡图例</h4><div style="display:flex;flex-wrap:wrap;gap:8px;">';
+  for (const c of sortedColors) {
+    legendHtml += `
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#f8f9fa;border-radius:6px;font-size:12px;border:1px solid #eee;">
+        <span style="width:14px;height:14px;background:${c.hex || '#ccc'};border-radius:3px;border:1px solid rgba(0,0,0,0.1);"></span>
+        <b>${c.code}</b> <span style="color:#666;">${c.name}</span> <span style="color:#999;">${c.count}粒</span>
+      </div>`;
+  }
+  legendHtml += '</div></div>';
+
+  container.innerHTML = `
+    <div id="grid-scroll-box" style="overflow:auto;max-height:460px;padding:4px;">
+      ${gridHtml}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#666;">
+      <button onclick="zoomGrid(0.2)" style="padding:2px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;">+</button>
+      <button onclick="zoomGrid(-0.2)" style="padding:2px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;">-</button>
+      <button onclick="resetGridZoom()" style="padding:2px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;">重置</button>
+      <span id="grid-zoom-label">100%</span>
+    </div>
+    ${legendHtml}
+  `;
+
+  gridZoomScale = 1;
+  const scrollBox = document.getElementById('grid-scroll-box');
+  if (scrollBox) {
+    scrollBox.addEventListener('wheel', e => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        zoomGrid(e.deltaY > 0 ? -0.1 : 0.1);
+      }
+    }, { passive: false });
+  }
+}
+
+function zoomGrid(delta) {
+  gridZoomScale = Math.max(0.3, Math.min(5, gridZoomScale + delta));
+  const inner = document.getElementById('detail-grid-inner');
+  const label = document.getElementById('grid-zoom-label');
+  if (inner) inner.style.transform = `scale(${gridZoomScale})`;
+  if (label) label.textContent = Math.round(gridZoomScale * 100) + '%';
+}
+
+function resetGridZoom() {
+  gridZoomScale = 1;
+  const inner = document.getElementById('detail-grid-inner');
+  const label = document.getElementById('grid-zoom-label');
+  if (inner) inner.style.transform = 'scale(1)';
+  if (label) label.textContent = '100%';
+}
+
+let editSelectedIps = [];
+let editShowIpInput = false;
+
+function enableEditMode() {
+  if (!currentPattern) return;
+  document.getElementById('btn-edit').style.display = 'none';
+  editSelectedIps = [...(currentPattern.ip_name || [])];
+  editShowIpInput = false;
+  renderEditForm(currentPattern);
+}
+
+function renderEditForm(p) {
+  const sortedColors = [...p.color_usage].sort((a, b) => b.count - a.count);
+  let colorRows = '';
+  for (const c of sortedColors) {
+    colorRows += `
+      <div class="edit-color-row" data-code="${c.code}" style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:6px;margin-bottom:6px;">
+        <div style="width:28px;height:28px;background:${c.hex || '#ccc'};border-radius:4px;border:1px solid #ddd;flex-shrink:0;"></div>
+        <div style="flex:1;">
+          <div style="font-weight:bold;font-size:14px;">${c.code}</div>
+          <div style="font-size:12px;color:#666;">${c.name}</div>
+        </div>
+        <input type="number" class="edit-qty" min="1" value="${c.count}" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:6px;">
+        <button type="button" onclick="removeEditColor('${c.code}')" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:18px;">×</button>
+      </div>
+    `;
+  }
+
+  document.getElementById('detail-title').innerHTML = '编辑图案';
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="form-row" style="margin:0;">
+        <div class="form-group" style="flex:2;">
+          <label>图案名称</label>
+          <input type="text" id="edit-name" value="${p.name}" style="padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+        </div>
+      </div>
+      <div class="form-row" style="margin:0;">
+        <div class="form-group">
+          <label>状态</label>
+          <select id="edit-status" style="padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:#fff;">
+            <option value="pending" ${p.status === 'pending' ? 'selected' : ''}>待制作</option>
+            <option value="done" ${p.status === 'done' ? 'selected' : ''}>已完成</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>宽（格子）</label>
+          <input type="number" id="edit-width" value="${p.width}" min="1" style="padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+        </div>
+        <div class="form-group">
+          <label>高（格子）</label>
+          <input type="number" id="edit-height" value="${p.height}" min="1" style="padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+        </div>
+      </div>
+      <div class="form-row" style="margin:0;">
+        <div class="form-group" style="flex:1;">
+          <label>IP / 来源</label>
+          <div id="edit-ip-tags" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+          <div style="margin-top:8px;">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditTagManager()" style="font-size:12px;padding:4px 10px;">🏷️ 管理标签</button>
+          </div>
+          <div id="edit-tag-manager-panel" style="display:none;margin-top:10px;padding:12px;background:#f8f9fa;border-radius:8px;">
+            <div style="font-size:12px;color:#666;margin-bottom:8px;">点击 × 删除标签（已关联图案的标签仅会从候选列表移除）</div>
+            <div id="edit-tag-manager-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-size:14px;margin-bottom:10px;color:#555;">色号用量</h3>
+        <div id="edit-colors-list">${colorRows}</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+        <button class="btn btn-secondary" onclick="cancelEdit()">取消</button>
+      </div>
+    </div>
+  `;
+  renderEditIpTags();
+}
+
+function renderEditIpTags() {
+  const container = document.getElementById('edit-ip-tags');
+  if (!container) return;
+  let html = '';
+  for (const ip of knownIps) {
+    const active = editSelectedIps.includes(ip) ? 'active' : '';
+    html += `<button type="button" class="ip-tag ${active}" onclick="toggleEditIp('${ip}')">${ip}</button>`;
+  }
+  html += `<button type="button" class="ip-tag add" onclick="toggleEditIpInput()">+</button>`;
+  if (editShowIpInput) {
+    html += `<input type="text" id="edit-ip-input-inline" placeholder="输入新标签，回车确认" style="width:140px;padding:4px 10px;border:1px solid #4f8cff;border-radius:12px;font-size:13px;" onkeydown="if(event.key==='Enter')confirmEditNewIp()">`;
+  }
+  container.innerHTML = html;
+  if (editShowIpInput) {
+    setTimeout(() => {
+      const input = document.getElementById('edit-ip-input-inline');
+      if (input) input.focus();
+    }, 10);
+  }
+}
+
+function toggleEditIp(ip) {
+  if (editSelectedIps.includes(ip)) {
+    editSelectedIps = editSelectedIps.filter(i => i !== ip);
+  } else {
+    editSelectedIps.push(ip);
+  }
+  renderEditIpTags();
+}
+
+function toggleEditIpInput() {
+  editShowIpInput = !editShowIpInput;
+  renderEditIpTags();
+}
+
+async function confirmEditNewIp() {
+  const input = document.getElementById('edit-ip-input-inline');
+  if (!input) return;
+  const text = input.value.trim();
+  if (text) {
+    if (!knownIps.includes(text)) {
+      knownIps.push(text);
+      await api('/api/pattern-ips', {method: 'POST', body: {name: text}});
+    }
+    if (!editSelectedIps.includes(text)) editSelectedIps.push(text);
+  }
+  editShowIpInput = false;
+  renderEditIpTags();
+  renderEditTagManager();
+}
+
+function toggleEditTagManager() {
+  const panel = document.getElementById('edit-tag-manager-panel');
+  if (!panel) return;
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) renderEditTagManager();
+}
+
+function renderEditTagManager() {
+  const container = document.getElementById('edit-tag-manager-list');
+  if (!container) return;
+  if (knownIps.length === 0) {
+    container.innerHTML = '<span style="color:#999;font-size:12px;">暂无标签</span>';
+    return;
+  }
+  let html = '';
+  for (const ip of knownIps) {
+    html += `
+      <div style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e3f2fd;color:#1565c0;border-radius:14px;font-size:13px;">
+        ${ip}
+        <button type="button" onclick="deleteEditTag('${ip}')" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:14px;line-height:1;">×</button>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+async function deleteEditTag(name) {
+  if (!confirm(`确定删除标签 "${name}" 吗？`)) return;
+  await api(`/api/pattern-ips/${encodeURIComponent(name)}`, {method: 'DELETE'});
+  knownIps = knownIps.filter(ip => ip !== name);
+  editSelectedIps = editSelectedIps.filter(ip => ip !== name);
+  renderEditIpTags();
+  renderEditTagManager();
+}
+
+function removeEditColor(code) {
+  const row = document.querySelector(`.edit-color-row[data-code="${code}"]`);
+  if (row) row.remove();
+}
+
+async function saveEdit() {
+  if (!currentPattern) return;
+  const name = document.getElementById('edit-name').value.trim();
+  if (!name) { alert('图案名称不能为空'); return; }
+
+  const status = document.getElementById('edit-status').value;
+  const width = parseInt(document.getElementById('edit-width').value) || currentPattern.width;
+  const height = parseInt(document.getElementById('edit-height').value) || currentPattern.height;
+
+  const ip_name = [...editSelectedIps];
+
+  const colorRows = document.querySelectorAll('.edit-color-row');
+  const color_usage = {};
+  for (const row of colorRows) {
+    const code = row.getAttribute('data-code');
+    const qty = parseInt(row.querySelector('.edit-qty').value) || 1;
+    if (code && qty > 0) color_usage[code] = qty;
+  }
+
+  const res = await api(`/api/patterns/${currentPattern.id}`, {
+    method: 'PUT',
+    body: { name, status, width, height, ip_name, color_usage },
+  });
+
+  if (res.ok) {
+    currentPattern = res.pattern;
+    renderDetailView(currentPattern);
+    document.getElementById('btn-edit').style.display = 'inline-flex';
+    loadPatterns();
+  } else {
+    alert(res.error || '保存失败');
+  }
+}
+
+function cancelEdit() {
+  if (!currentPattern) return;
+  renderDetailView(currentPattern);
+  document.getElementById('btn-edit').style.display = 'inline-flex';
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').style.display = 'none';
+}
+
+// --- Image Viewer with zoom & pan ---
+let viewerState = { scale: 1, offsetX: 0, offsetY: 0, isDragging: false, lastX: 0, lastY: 0, naturalWidth: 0, naturalHeight: 0 };
+
+function openImageViewer(src) {
+  const img = document.getElementById('viewer-img');
+  const viewer = document.getElementById('image-viewer');
+  img.src = src;
+  img.onload = function() {
+    viewerState.naturalWidth = img.naturalWidth;
+    viewerState.naturalHeight = img.naturalHeight;
+    viewerReset();
+  };
+  img.onerror = function() {
+    this.onerror = null;
+    this.src = src.replace('/images/', '/thumbnails/');
+  };
+  viewer.style.display = 'block';
+}
+
+function closeImageViewer() {
+  document.getElementById('image-viewer').style.display = 'none';
+  viewerState.isDragging = false;
+}
+
+function applyViewerTransform() {
+  const img = document.getElementById('viewer-img');
+  img.style.transform = `translate(calc(-50% + ${viewerState.offsetX}px), calc(-50% + ${viewerState.offsetY}px)) scale(${viewerState.scale})`;
+  const label = document.getElementById('viewer-scale');
+  if (label) label.textContent = Math.round(viewerState.scale * 100) + '%';
+}
+
+function viewerReset() {
+  const img = document.getElementById('viewer-img');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const imgW = viewerState.naturalWidth || img.naturalWidth || 1;
+  const imgH = viewerState.naturalHeight || img.naturalHeight || 1;
+  const scaleX = (vw * 0.9) / imgW;
+  const scaleY = (vh * 0.9) / imgH;
+  viewerState.scale = Math.min(scaleX, scaleY, 1);
+  viewerState.offsetX = 0;
+  viewerState.offsetY = 0;
+  applyViewerTransform();
+}
+
+function viewerZoom(delta) {
+  viewerState.scale = Math.max(0.1, Math.min(10, viewerState.scale + delta));
+  applyViewerTransform();
+}
+
+function viewerZoomAt(delta, centerX, centerY) {
+  const oldScale = viewerState.scale;
+  const newScale = Math.max(0.1, Math.min(10, oldScale + delta));
+  const ratio = newScale / oldScale;
+  viewerState.offsetX = centerX - (centerX - viewerState.offsetX) * ratio;
+  viewerState.offsetY = centerY - (centerY - viewerState.offsetY) * ratio;
+  viewerState.scale = newScale;
+  applyViewerTransform();
+}
+
+const viewer = document.getElementById('image-viewer');
+const viewerImg = document.getElementById('viewer-img');
+const viewerToolbar = document.getElementById('viewer-toolbar');
+
+viewer.addEventListener('click', e => {
+  if (e.target === viewer) closeImageViewer();
+});
+viewerImg.addEventListener('click', e => e.stopPropagation());
+viewerToolbar.addEventListener('click', e => e.stopPropagation());
+
+viewerImg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = viewerImg.getBoundingClientRect();
+  const cx = e.clientX - rect.left - rect.width / 2;
+  const cy = e.clientY - rect.top - rect.height / 2;
+  viewerZoomAt(e.deltaY > 0 ? -0.15 : 0.15, cx, cy);
+}, { passive: false });
+
+viewerImg.addEventListener('dblclick', e => {
+  e.stopPropagation();
+  if (viewerState.scale > 1.5) {
+    viewerReset();
+  } else {
+    const rect = viewerImg.getBoundingClientRect();
+    const cx = e.clientX - rect.left - rect.width / 2;
+    const cy = e.clientY - rect.top - rect.height / 2;
+    viewerZoomAt(0.5, cx, cy);
+  }
+});
+
+viewerImg.addEventListener('mousedown', e => {
+  e.preventDefault();
+  viewerState.isDragging = true;
+  viewerState.lastX = e.clientX;
+  viewerState.lastY = e.clientY;
+  viewer.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', e => {
+  if (!viewerState.isDragging) return;
+  viewerState.offsetX += e.clientX - viewerState.lastX;
+  viewerState.offsetY += e.clientY - viewerState.lastY;
+  viewerState.lastX = e.clientX;
+  viewerState.lastY = e.clientY;
+  applyViewerTransform();
+});
+window.addEventListener('mouseup', () => {
+  viewerState.isDragging = false;
+  viewer.style.cursor = 'grab';
+});
+
+async function deletePattern(patternId) {
+  if (!confirm('确定删除该图案吗？')) return;
+  await api(`/api/patterns/${patternId}`, {method:'DELETE'});
+  loadPatterns();
+}
+
+// Close modal on backdrop click
+document.getElementById('detail-modal').addEventListener('click', e => {
+  if (e.target.id === 'detail-modal') closeDetail();
+});
+
+window.addEventListener('brandchange', () => {
+  const sel = document.getElementById('mp-brand');
+  if (sel) { sel.value = getCurrentBrand(); loadChartColors(); }
+});
+loadPatterns();
+loadBrands();
+loadKnownIps();
+</script>
+
+<style>
+.ip-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ip-tag.active {
+  background: #1565c0;
+  color: #fff;
+}
+.ip-tag.add {
+  background: #f0f0f0;
+  color: #666;
+  border: 1px dashed #ccc;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+}
+.ip-tag.add:hover {
+  background: #e0e0e0;
+}
+.color-swatch-btn {
+  transition: transform 0.1s;
+  user-select: none;
+}
+.color-swatch-btn:hover {
+  transform: scale(1.1);
+  z-index: 1;
+}
+.required { color: #e53935; }
+</style>
+{% endblock %}

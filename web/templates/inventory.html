@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+{% block title %}库存管理 - Bead Matcher{% endblock %}
+{% block content %}
+<style>
+  .wizard-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .wizard-desc { color: #666; margin-bottom: 20px; }
+  .prefix-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  .prefix-item { background: white; border-radius: 8px; padding: 16px 20px; border: 1px solid #e5e7eb; cursor: pointer; }
+  .prefix-item input { margin-right: 8px; cursor: pointer; }
+  .color-dot-inline { display: inline-block; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #ccc; vertical-align: middle; }
+  .qty-input { width: 80px; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; text-align: right; }
+  .series-table th, .series-table td { padding: 8px 12px; text-align: left; }
+  .series-table td { vertical-align: middle; }
+  .nav-btns { margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end; }
+  .nav-btns .left { margin-right: auto; }
+</style>
+
+<!-- ===== 正常管理页 ===== -->
+<div id="page-normal">
+  <h1>库存管理</h1>
+
+  <div class="stats" id="stats">
+    <div class="stat-box"><div class="label">品牌</div><div class="value" id="stat-brand">-</div></div>
+    <div class="stat-box"><div class="label">总色号</div><div class="value" id="stat-colors">0</div></div>
+    <div class="stat-box"><div class="label">总粒数</div><div class="value" id="stat-total">0</div></div>
+  </div>
+
+  <div class="card">
+    <h2>快捷操作</h2>
+    <div class="form-row">
+      <button class="btn btn-danger" onclick="startInit()">初始化库存</button>
+      <button class="btn btn-primary" onclick="startRestock()">补货录入</button>
+    </div>
+    <p style="color:#666;font-size:13px;margin-top:8px;">
+      初始化将清空现有库存并重新录入；补货在现有库存上累加。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>逐条操作</h2>
+    <div class="form-row">
+      <div class="form-group"><label>色号</label><input type="text" id="op-code" placeholder="如 A01"></div>
+      <div class="form-group"><label>数量</label><input type="number" id="op-qty" placeholder="0"></div>
+      <div style="display:flex;align-items:flex-end;gap:8px;">
+        <button class="btn btn-primary" onclick="addStock()">添加</button>
+        <button class="btn btn-primary" onclick="setStock()">设置</button>
+        <button class="btn btn-danger btn-sm" onclick="removeStock()">消耗</button>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <button class="btn btn-danger btn-sm" onclick="clearStock()">清空全部库存</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>当前库存</h2>
+    <div id="inventory-table"><div class="empty"><span class="icon">&#128230;</span>暂无库存数据</div></div>
+    <div id="invalid-warning" style="margin-top:12px;color:#c62828;font-size:13px;"></div>
+  </div>
+</div>
+
+<!-- ===== 初始化 - 系列选择 ===== -->
+<div id="page-init-prefix" style="display:none;">
+  <div class="wizard-title">初始化库存 — 选择系列</div>
+  <div class="wizard-desc">请勾选本次需要录入的色系系列，未勾选的系列将不会入库。</div>
+  <div class="prefix-grid" id="init-prefix-grid"></div>
+  <div style="margin-bottom:16px;">
+    <button class="btn btn-secondary btn-sm" onclick="selectAllPrefixes(true)">全选</button>
+    <button class="btn btn-secondary btn-sm" onclick="selectAllPrefixes(false)">取消全选</button>
+  </div>
+  <div class="nav-btns">
+    <button class="btn btn-secondary left" onclick="showPage('page-normal')">取消</button>
+    <button class="btn btn-primary" onclick="onPrefixSelected()">开始录入</button>
+  </div>
+</div>
+
+<!-- ===== 初始化 - 系列录入 ===== -->
+<div id="page-init-series" style="display:none;">
+  <div class="wizard-title" id="init-series-title"></div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="form-row">
+      <label>批量设置：</label>
+      <select id="batch-qty" style="padding:6px 12px;border-radius:6px;border:1px solid #d1d5db;">
+        <option value="100">100</option>
+        <option value="200">200</option>
+        <option value="500">500</option>
+        <option value="1000" selected>1000</option>
+        <option value="2000">2000</option>
+        <option value="5000">5000</option>
+        <option value="10000">10000</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="applyBatchQty()">应用到全部</button>
+    </div>
+  </div>
+  <div class="card">
+    <table class="series-table" style="width:100%;border-collapse:collapse;">
+      <thead><tr><th>色块</th><th>色号</th><th>名称</th><th>HEX</th><th>数量</th></tr></thead>
+      <tbody id="init-series-body"></tbody>
+    </table>
+  </div>
+  <div class="nav-btns">
+    <button class="btn btn-secondary left" id="btn-series-prev" onclick="seriesPrev()">上一步</button>
+    <button class="btn btn-secondary" onclick="seriesSkip()">跳过此系列</button>
+    <button class="btn btn-primary" id="btn-series-next" onclick="seriesNext()">下一步</button>
+    <button class="btn btn-primary" id="btn-series-done" style="display:none;" onclick="seriesDone()">完成入库</button>
+  </div>
+</div>
+
+<!-- ===== 补货 - 色号选择 ===== -->
+<div id="page-restock-select" style="display:none;">
+  <div class="wizard-title">补货录入 — 选择色号</div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="form-row">
+      <div class="form-group" style="flex:1;">
+        <label>搜索</label>
+        <input type="text" id="restock-search" placeholder="输入色号或名称过滤..." oninput="filterRestock()">
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="selectAllRestock(true)">全选可见</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectAllRestock(false)">取消全选</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <table class="series-table" style="width:100%;border-collapse:collapse;">
+      <thead><tr><th></th><th>色块</th><th>色号</th><th>名称</th><th>HEX</th></tr></thead>
+      <tbody id="restock-select-body"></tbody>
+    </table>
+  </div>
+  <div class="nav-btns">
+    <button class="btn btn-secondary left" onclick="showPage('page-normal')">取消</button>
+    <button class="btn btn-primary" onclick="onRestockSelectNext()">下一步</button>
+  </div>
+</div>
+
+<!-- ===== 补货 - 确认数量 ===== -->
+<div id="page-restock-confirm" style="display:none;">
+  <div class="wizard-title">补货录入 — 确认数量</div>
+  <div class="wizard-desc">默认每个色号 1000 粒，可在下方修改具体数量。</div>
+  <div class="card">
+    <table class="series-table" style="width:100%;border-collapse:collapse;">
+      <thead><tr><th>色块</th><th>色号</th><th>名称</th><th>HEX</th><th>数量</th></tr></thead>
+      <tbody id="restock-confirm-body"></tbody>
+    </table>
+  </div>
+  <div class="nav-btns">
+    <button class="btn btn-secondary left" onclick="onRestockConfirmBack()">返回修改</button>
+    <button class="btn btn-primary" onclick="onRestockConfirm()">确认入库</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chartData = null;
+let initState = { selectedPrefixes: [], currentIndex: 0, quantities: {} };
+let restockState = { selectedCodes: [], quantities: {} };
+
+function showPage(id) {
+  const pages = ['page-normal', 'page-init-prefix', 'page-init-series', 'page-restock-select', 'page-restock-confirm'];
+  pages.forEach(p => document.getElementById(p).style.display = (p === id ? 'block' : 'none'));
+}
+
+async function loadChart() {
+  const brand = getCurrentBrand();
+  chartData = await api(`/api/chart/${brand}`);
+}
+
+function getPrefix(code) {
+  if (code.startsWith('ZG')) return 'ZG';
+  if (code.startsWith('IC')) return 'IC';
+  if (code.startsWith('DH')) return 'DH';
+  if (code.startsWith('YX')) return 'YX';
+  return code[0] || '';
+}
+
+function getPrefixes() {
+  if (!chartData) return [];
+  const set = new Set();
+  chartData.colors.forEach(c => set.add(getPrefix(c.code)));
+  return Array.from(set).sort((a,b) => a.localeCompare(b));
+}
+
+function getColorsByPrefix(prefix) {
+  if (!chartData) return [];
+  return chartData.colors.filter(c => c.code.startsWith(prefix)).sort((a, b) => a.code.localeCompare(b.code));
+}
+
+function getPrefixName(prefix) {
+  const map = { A: 'Yellow 黄色系', B: 'Green 绿色系', C: 'Blue 蓝色系', D: 'Purple 紫色系',
+                E: 'Pink 粉色系', F: 'Red 红色系', G: 'Brown 棕色系', H: 'Grey 灰色系', M: 'Muted 柔和系',
+                P: 'Pastel 马卡龙系', Q: 'Fluorescent 荧光系', R: 'Special 特殊系', T: 'White 白色系',
+                Y: 'Soft 柔和荧光系', ZG: 'Vintage 复古系', IC: 'Ice 冰晶系', DH: 'Dark 暗色系', YX: 'Metallic 金属系' };
+  return map[prefix] || prefix;
+}
+
+// ---------- 正常管理页 ----------
+
+async function loadInventory() {
+  const brand = getCurrentBrand();
+  const data = await api(`/api/inventory?brand=${brand}`);
+  if (!data.brand) {
+    document.getElementById('stats').style.display = 'none';
+    document.getElementById('inventory-table').innerHTML = '<div class="empty"><span class="icon">&#128230;</span>暂无库存数据，请先初始化</div>';
+    return;
+  }
+  document.getElementById('stats').style.display = 'flex';
+  document.getElementById('stat-brand').textContent = data.brand;
+  document.getElementById('stat-colors').textContent = data.items.length;
+  document.getElementById('stat-total').textContent = data.total;
+
+  if (data.items.length === 0) {
+    document.getElementById('inventory-table').innerHTML = '<div class="empty">库存为空</div>';
+  } else {
+    const rows = data.items.map(item => `
+      <tr>
+        <td><span class="color-dot" style="background:${item.hex || '#ccc'}"></span>${item.code}</td>
+        <td>${item.name}</td>
+        <td>${item.quantity}</td>
+      </tr>
+    `).join('');
+    document.getElementById('inventory-table').innerHTML = `
+      <table><thead><tr><th>色号</th><th>名称</th><th>数量</th></tr></thead><tbody>${rows}</tbody></table>
+    `;
+  }
+
+  if (data.invalid && data.invalid.length > 0) {
+    document.getElementById('invalid-warning').innerHTML = `&#9888; 以下色号不在当前色卡中: ${data.invalid.join(', ')}`;
+  } else {
+    document.getElementById('invalid-warning').innerHTML = '';
+  }
+}
+
+function showMsg(text, ok) {
+  const el = document.getElementById('msg');
+  el.innerHTML = `<div class="message ${ok ? 'success' : 'error'}">${text}</div>`;
+  setTimeout(() => el.innerHTML = '', 3000);
+}
+
+async function addStock() {
+  const brand = getCurrentBrand();
+  const code = document.getElementById('op-code').value;
+  const qty = parseInt(document.getElementById('op-qty').value) || 0;
+  const res = await api('/api/inventory/add', {method:'POST', body:{brand, code, quantity:qty}});
+  showMsg(res.ok ? `已添加 ${code}: ${res.quantity}` : res.error, res.ok);
+  if (res.ok) loadInventory();
+}
+
+async function setStock() {
+  const brand = getCurrentBrand();
+  const code = document.getElementById('op-code').value;
+  const qty = parseInt(document.getElementById('op-qty').value) || 0;
+  const res = await api('/api/inventory/set', {method:'POST', body:{brand, code, quantity:qty}});
+  showMsg(res.ok ? `已设置 ${code}: ${res.quantity}` : res.error, res.ok);
+  if (res.ok) loadInventory();
+}
+
+async function removeStock() {
+  const brand = getCurrentBrand();
+  const code = document.getElementById('op-code').value;
+  const qty = parseInt(document.getElementById('op-qty').value) || 0;
+  const res = await api('/api/inventory/remove', {method:'POST', body:{brand, code, quantity:qty}});
+  showMsg(res.ok ? `已消耗 ${code}: 剩余 ${res.quantity}` : res.error, res.ok);
+  if (res.ok) loadInventory();
+}
+
+async function clearStock() {
+  if (!confirm('确定要清空所有库存吗？')) return;
+  const brand = getCurrentBrand();
+  const res = await api('/api/inventory/clear', {method:'POST', body:{brand}});
+  showMsg(res.ok ? '库存已清空' : res.error, res.ok);
+  if (res.ok) loadInventory();
+}
+
+// ---------- 初始化流程 ----------
+
+async function startInit() {
+  if (!confirm('初始化将清空现有库存数据，且不可恢复。是否继续？')) return;
+  initState = { selectedPrefixes: [], currentIndex: 0, quantities: {} };
+  await loadChart();
+  renderInitPrefix();
+  showPage('page-init-prefix');
+}
+
+function renderInitPrefix() {
+  const grid = document.getElementById('init-prefix-grid');
+  const prefixes = getPrefixes();
+  grid.innerHTML = prefixes.map(p => {
+    const colors = getColorsByPrefix(p);
+    return `
+      <label class="prefix-item">
+        <input type="checkbox" value="${p}" class="prefix-cb">
+        <strong>${p}</strong> ${getPrefixName(p)} (${colors.length}色)
+      </label>
+    `;
+  }).join('');
+}
+
+function selectAllPrefixes(checked) {
+  document.querySelectorAll('.prefix-cb').forEach(cb => cb.checked = checked);
+}
+
+function onPrefixSelected() {
+  const selected = Array.from(document.querySelectorAll('.prefix-cb:checked')).map(cb => cb.value);
+  if (selected.length === 0) { alert('请至少选择一个系列'); return; }
+  initState.selectedPrefixes = selected;
+  initState.currentIndex = 0;
+  initState.quantities = {};
+  renderInitSeries();
+  showPage('page-init-series');
+}
+
+function renderInitSeries() {
+  const prefix = initState.selectedPrefixes[initState.currentIndex];
+  const colors = getColorsByPrefix(prefix);
+  const name = getPrefixName(prefix);
+  document.getElementById('init-series-title').textContent =
+    `系列 ${prefix} — ${name} (${colors.length}色)  (${initState.currentIndex + 1}/${initState.selectedPrefixes.length})`;
+
+  const tbody = document.getElementById('init-series-body');
+  tbody.innerHTML = colors.map(c => {
+    const saved = initState.quantities[c.code] || 0;
+    return `
+      <tr data-code="${c.code}">
+        <td><span class="color-dot-inline" style="background:${c.hex || '#ccc'}"></span></td>
+        <td>${c.code}</td>
+        <td>${c.name}</td>
+        <td>${c.hex || '-'}</td>
+        <td><input type="number" class="qty-input init-qty" value="${saved}" min="0"></td>
+      </tr>
+    `;
+  }).join('');
+
+  const isFirst = initState.currentIndex === 0;
+  const isLast = initState.currentIndex === initState.selectedPrefixes.length - 1;
+  document.getElementById('btn-series-prev').style.display = isFirst ? 'none' : 'inline-block';
+  document.getElementById('btn-series-next').style.display = isLast ? 'none' : 'inline-block';
+  document.getElementById('btn-series-done').style.display = isLast ? 'inline-block' : 'none';
+}
+
+function saveCurrentSeriesQuantities() {
+  document.querySelectorAll('#init-series-body tr').forEach(tr => {
+    const code = tr.getAttribute('data-code');
+    const input = tr.querySelector('.init-qty');
+    initState.quantities[code] = parseInt(input.value) || 0;
+  });
+}
+
+function applyBatchQty() {
+  const qty = document.getElementById('batch-qty').value;
+  document.querySelectorAll('.init-qty').forEach(input => input.value = qty);
+}
+
+function seriesPrev() {
+  saveCurrentSeriesQuantities();
+  initState.currentIndex--;
+  renderInitSeries();
+}
+
+function seriesSkip() {
+  document.querySelectorAll('#init-series-body tr').forEach(tr => {
+    const code = tr.getAttribute('data-code');
+    initState.quantities[code] = 0;
+  });
+  saveCurrentSeriesQuantities();
+  if (initState.currentIndex >= initState.selectedPrefixes.length - 1) {
+    seriesDone();
+    return;
+  }
+  initState.currentIndex++;
+  renderInitSeries();
+}
+
+function seriesNext() {
+  saveCurrentSeriesQuantities();
+  if (initState.currentIndex >= initState.selectedPrefixes.length - 1) {
+    seriesDone();
+    return;
+  }
+  initState.currentIndex++;
+  renderInitSeries();
+}
+
+async function seriesDone() {
+  saveCurrentSeriesQuantities();
+  const brand = getCurrentBrand();
+  const items = Object.entries(initState.quantities)
+    .filter(([_, qty]) => qty > 0)
+    .map(([code, quantity]) => ({ code, quantity }));
+  const res = await api('/api/inventory/batch-init', {method:'POST', body:{brand, items}});
+  if (res.ok) {
+    alert(`库存初始化完成，共录入 ${res.colors} 个色号，${res.total} 粒`);
+    loadInventory();
+    showPage('page-normal');
+  } else {
+    alert(res.error || '初始化失败');
+  }
+}
+
+// ---------- 补货流程 ----------
+
+async function startRestock() {
+  const brand = getCurrentBrand();
+  const inv = await api(`/api/inventory?brand=${brand}`);
+  if (!inv.brand) { alert('尚未初始化库存，请先初始化'); return; }
+  restockState = { selectedCodes: [], quantities: {} };
+  await loadChart();
+  renderRestockSelect();
+  showPage('page-restock-select');
+}
+
+function renderRestockSelect() {
+  const tbody = document.getElementById('restock-select-body');
+  if (!chartData) { tbody.innerHTML = ''; return; }
+  const colors = chartData.colors.slice().sort((a, b) => a.code.localeCompare(b.code));
+  tbody.innerHTML = colors.map(c => `
+    <tr data-code="${c.code}">
+      <td><input type="checkbox" class="restock-cb"></td>
+      <td><span class="color-dot-inline" style="background:${c.hex || '#ccc'}"></span></td>
+      <td>${c.code}</td>
+      <td>${c.name}</td>
+      <td>${c.hex || '-'}</td>
+    </tr>
+  `).join('');
+}
+
+function filterRestock() {
+  const text = document.getElementById('restock-search').value.toLowerCase();
+  document.querySelectorAll('#restock-select-body tr').forEach(tr => {
+    const code = tr.getAttribute('data-code');
+    const name = tr.children[3].textContent;
+    tr.style.display = (text && !code.toLowerCase().includes(text) && !name.toLowerCase().includes(text)) ? 'none' : '';
+  });
+}
+
+function selectAllRestock(checked) {
+  document.querySelectorAll('#restock-select-body tr').forEach(tr => {
+    if (tr.style.display !== 'none') {
+      tr.querySelector('.restock-cb').checked = checked;
+    }
+  });
+}
+
+function onRestockSelectNext() {
+  const selected = Array.from(document.querySelectorAll('#restock-select-body tr'))
+    .filter(tr => tr.querySelector('.restock-cb').checked)
+    .map(tr => tr.getAttribute('data-code'));
+  if (selected.length === 0) { alert('请至少选择一个色号'); return; }
+  const oldQty = restockState.quantities;
+  restockState.selectedCodes = selected;
+  restockState.quantities = {};
+  selected.forEach(code => {
+    restockState.quantities[code] = oldQty[code] !== undefined ? oldQty[code] : 1000;
+  });
+  renderRestockConfirm();
+  showPage('page-restock-confirm');
+}
+
+function renderRestockConfirm() {
+  const tbody = document.getElementById('restock-confirm-body');
+  tbody.innerHTML = restockState.selectedCodes.sort().map(code => {
+    const c = chartData.colors.find(x => x.code === code);
+    const saved = restockState.quantities[code] !== undefined ? restockState.quantities[code] : 1000;
+    return `
+      <tr data-code="${code}">
+        <td><span class="color-dot-inline" style="background:${c ? c.hex : '#ccc'}"></span></td>
+        <td>${code}</td>
+        <td>${c ? c.name : '未知'}</td>
+        <td>${c ? c.hex : '-'}</td>
+        <td><input type="number" class="qty-input restock-qty" value="${saved}" min="0"></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function onRestockConfirmBack() {
+  document.querySelectorAll('#restock-confirm-body tr').forEach(tr => {
+    const code = tr.getAttribute('data-code');
+    const val = parseInt(tr.querySelector('.restock-qty').value) || 0;
+    restockState.quantities[code] = val;
+  });
+  showPage('page-restock-select');
+}
+
+async function onRestockConfirm() {
+  const brand = getCurrentBrand();
+  const items = [];
+  document.querySelectorAll('#restock-confirm-body tr').forEach(tr => {
+    const code = tr.getAttribute('data-code');
+    const qty = parseInt(tr.querySelector('.restock-qty').value) || 0;
+    if (qty > 0) items.push({ code, quantity: qty });
+  });
+  const res = await api('/api/inventory/batch-add', {method:'POST', body:{brand, items}});
+  if (res.ok) {
+    alert(`补货完成，共添加 ${items.length} 个色号`);
+    loadInventory();
+    showPage('page-normal');
+  } else {
+    alert(res.error || '补货失败');
+  }
+}
+
+// 品牌切换时自动刷新
+window.addEventListener('brandchange', () => {
+  chartData = null;
+  loadInventory();
+});
+
+// 页面加载时
+loadInventory();
+</script>
+{% endblock %}

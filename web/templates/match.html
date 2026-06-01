@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}库存匹配 - Bead Matcher{% endblock %}
+{% block content %}
+<h1>库存匹配</h1>
+
+<div class="stats" id="inventory-stats" style="display:none;">
+  <div class="stat-box">
+    <div class="label">库存品牌</div>
+    <div class="value" id="inv-brand" style="font-size:18px;">-</div>
+  </div>
+  <div class="stat-box">
+    <div class="label">库存总粒数</div>
+    <div class="value" id="inv-total">0</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>✅ 当前库存能拼的图案</h2>
+  <div id="fully-match">
+    <div class="empty">请先初始化库存</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>⚠️ 差一点就能拼的图案（按缺口排序）</h2>
+  <div id="partial-match">
+    <div class="empty">请先初始化库存</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadMatch() {
+  const brand = getCurrentBrand();
+  const data = await api(`/api/match?brand=${brand}`);
+  if (data.error) {
+    document.getElementById('inventory-stats').style.display = 'none';
+    document.getElementById('fully-match').innerHTML = `<div class="empty">${data.error}</div>`;
+    document.getElementById('partial-match').innerHTML = `<div class="empty">${data.error}</div>`;
+    return;
+  }
+
+  document.getElementById('inventory-stats').style.display = 'flex';
+  document.getElementById('inv-brand').textContent = data.inventory_brand;
+  document.getElementById('inv-total').textContent = data.inventory_total;
+
+  if (data.fully_match.length === 0) {
+    document.getElementById('fully-match').innerHTML = '<div class="empty">没有库存能完全覆盖的图案</div>';
+  } else {
+    const rows = data.fully_match.map(p => `
+      <tr>
+        <td><strong>${p.name}</strong></td>
+        <td>${p.brand}</td>
+        <td>${p.width}x${p.height}</td>
+        <td>${p.total_beads}</td>
+        <td>${p.colors}</td>
+        <td><span class="tag tag-success">可制作</span></td>
+      </tr>
+    `).join('');
+    document.getElementById('fully-match').innerHTML = `
+      <table>
+        <thead><tr><th>名称</th><th>品牌</th><th>尺寸</th><th>粒数</th><th>色号</th><th>状态</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  if (data.partial_match.length === 0) {
+    document.getElementById('partial-match').innerHTML = '<div class="empty">没有部分匹配的图案</div>';
+  } else {
+    const rows = data.partial_match.map(p => {
+      const shortageList = Object.entries(p.shortage).map(([code, qty]) => `${code}缺${qty}`).join(', ');
+      return `
+        <tr>
+          <td><strong>${p.name}</strong></td>
+          <td>${p.brand}</td>
+          <td>${p.width}x${p.height}</td>
+          <td>${p.total_beads}</td>
+          <td>${p.missing_total} 粒</td>
+          <td style="font-size:12px;color:#666;">${shortageList}</td>
+        </tr>
+      `;
+    }).join('');
+    document.getElementById('partial-match').innerHTML = `
+      <table>
+        <thead><tr><th>名称</th><th>品牌</th><th>尺寸</th><th>粒数</th><th>缺货</th><th>缺口详情</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+}
+
+window.addEventListener('brandchange', loadMatch);
+loadMatch();
+</script>
+{% endblock %}

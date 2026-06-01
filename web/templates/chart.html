@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}色卡查看 - Bead Matcher{% endblock %}
+{% block content %}
+<h1>色卡查看</h1>
+
+<div class="card">
+  <div class="form-row">
+    <div class="form-group" style="flex:0 0 200px;">
+      <label>品牌</label>
+      <select id="brand-select"></select>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>色号列表</h2>
+  <div id="chart-grid" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadBrands() {
+  const brands = await api('/api/brands');
+  const sel = document.getElementById('brand-select');
+  sel.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
+  sel.onchange = () => loadChart(sel.value);
+  loadChart(brands[0]);
+}
+
+async function loadChart(brand) {
+  const data = await api(`/api/chart/${brand}`);
+  if (!data.ok === false) {
+    document.getElementById('chart-grid').innerHTML = '<div class="empty">加载失败</div>';
+    return;
+  }
+  const items = data.colors.map(c => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fafbfc;border-radius:6px;border:1px solid #eee;min-width:140px;">
+      <span class="color-dot" style="background:${c.hex || '#ccc'}"></span>
+      <div>
+        <div style="font-weight:600;font-size:13px;">${c.code}</div>
+        <div style="font-size:12px;color:#888;">${c.name}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('chart-grid').innerHTML = items;
+}
+
+loadBrands();
+</script>
+{% endblock %}

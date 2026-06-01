@@ -1,0 +1,18 @@
+# bead-matcher 核心依赖
+# Python >= 3.10
+
+Pillow>=10.0.0
+PyQt6>=6.4.0
+Flask>=2.3.0
+
+# 可选依赖（按需安装）
+# OCR 图片分析模式:
+#   pip install pytesseract>=0.3.10
+#   并安装 Tesseract-OCR 引擎: https://github.com/UB-Mannheim/tesseract/wiki
+#
+# AI 视觉分析（Moonshot Kimi）:
+#   pip install openai>=1.0.0
+#   并设置环境变量 KIMI_API_KEY
+#
+# 运行测试:
+#   pip install pytest>=7.0.0

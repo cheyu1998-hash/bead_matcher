@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}图片转图案 - Bead Matcher{% endblock %}
+{% block content %}
+<h1>图片转拼豆图案</h1>
+
+<div class="card">
+  <h2>上传图片</h2>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1;">
+      <label>拖拽图片到下方区域（支持从微信、文件管理器直接拖）</label>
+      <div id="dropzone" style="margin-top:8px;padding:40px;text-align:center;background:#f5f7fa;border:2px dashed #ccc;border-radius:8px;color:#888;cursor:pointer;transition:all 0.2s;">
+        <div style="font-size:32px;margin-bottom:8px;">&#128247;</div>
+        <div>拖拽图片到此处 或 点击选择文件</div>
+      </div>
+      <input type="file" id="image-file" accept="image/*" style="display:none;">
+    </div>
+  </div>
+
+  <div id="file-name" style="margin-bottom:12px;font-size:13px;color:#666;"></div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:2;">
+      <label>图案名称</label>
+      <input type="text" id="pattern-name" placeholder="如 皮卡丘">
+    </div>
+    <div class="form-group">
+      <label>品牌</label>
+      <select id="brand-select"></select>
+    </div>
+    <div class="form-group">
+      <label>网格宽度（留空自动）</label>
+      <input type="number" id="target-w" placeholder="自动">
+    </div>
+    <div class="form-group">
+      <label>网格高度（留空自动）</label>
+      <input type="number" id="target-h" placeholder="自动">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>最大颜色数</label>
+      <input type="number" id="max-colors" value="20" min="1" max="50">
+    </div>
+    <div class="form-group" style="flex:2;">
+      <label>相似度合并阈值（RGB 色差，0 表示不合并）</label>
+      <input type="number" id="threshold" value="0" min="0" max="100" step="1">
+      <div style="font-size:11px;color:#888;margin-top:4px;">色差小于阈值的相似色会自动合并，建议 15~30</div>
+    </div>
+  </div>
+
+  <div style="margin-top:8px;">
+    <button class="btn btn-primary" onclick="convert()">开始转换</button>
+  </div>
+  <div id="msg"></div>
+</div>
+
+<div class="card" id="result-card" style="display:none;">
+  <h2>转换结果</h2>
+  <div id="result-content"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadBrands() {
+  const brands = await api('/api/brands');
+  const current = getCurrentBrand();
+  const sel = document.getElementById('brand-select');
+  sel.innerHTML = brands.map(b => `<option value="${b}" ${b === current ? 'selected' : ''}>${b}</option>`).join('');
+  sel.onchange = () => setCurrentBrand(sel.value);
+}
+
+function showMsg(text, ok) {
+  const el = document.getElementById('msg');
+  el.innerHTML = `<div class="message ${ok ? 'success' : 'error'}">${text}</div>`;
+  setTimeout(() => el.innerHTML = '', 5000);
+}
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('image-file');
+let currentFile = null;
+
+dropzone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropzone.style.borderColor = '#4f8cff';
+  dropzone.style.background = '#eef3ff';
+});
+
+dropzone.addEventListener('dragleave', e => {
+  e.preventDefault();
+  dropzone.style.borderColor = '#ccc';
+  dropzone.style.background = '#f5f7fa';
+});
+
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.style.borderColor = '#ccc';
+  dropzone.style.background = '#f5f7fa';
+  const files = e.dataTransfer.files;
+  if (files.length > 0) setFile(files[0]);
+});
+
+dropzone.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length > 0) setFile(e.target.files[0]);
+});
+
+function setFile(file) {
+  currentFile = file;
+  document.getElementById('file-name').textContent = `已选择: ${file.name}`;
+  dropzone.innerHTML = `<div style="font-size:18px;color:#4caf50;">✓ ${file.name}</div><div style="font-size:12px;color:#888;margin-top:4px;">点击或拖拽可更换图片</div>`;
+  dropzone.style.borderColor = '#4caf50';
+  dropzone.style.background = '#e8f5e9';
+}
+
+function isLight(hex) {
+  if (!hex || hex.length < 7) return true;
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return (r*299 + g*587 + b*114) / 1000 > 128;
+}
+
+async function convert() {
+  if (!currentFile) {
+    showMsg('请先选择图片', false);
+    return;
+  }
+  const name = document.getElementById('pattern-name').value.trim();
+  if (!name) {
+    showMsg('请输入图案名称', false);
+    return;
+  }
+
+  const form = new FormData();
+  form.append('image', currentFile);
+  form.append('brand', document.getElementById('brand-select').value);
+  form.append('name', name);
+  form.append('width', document.getElementById('target-w').value);
+  form.append('height', document.getElementById('target-h').value);
+  form.append('max_colors', document.getElementById('max-colors').value);
+  form.append('threshold', document.getElementById('threshold').value);
+
+  showMsg('转换中，请稍候...', true);
+  let data;
+  try {
+    const res = await fetch('/api/convert', {method:'POST', body:form});
+    const text = await res.text();
+    try { data = JSON.parse(text); } catch { data = {ok: false, error: '服务器返回异常'}; }
+  } catch (e) {
+    data = {ok: false, error: `网络错误: ${e.message}`};
+  }
+
+  if (data.ok) {
+    showMsg('转换成功！', true);
+    const p = data.pattern;
+    document.getElementById('result-card').style.display = 'block';
+
+    // 构建色号映射
+    const colorMap = {};
+    for (const c of p.color_usage) colorMap[c.code] = c;
+
+    // 拼豆网格预览（带格线）
+    const cellSize = p.width <= 48 ? 14 : 10;
+    const showCode = p.width <= 48;
+    let gridHtml = `<div style="display:grid;grid-template-columns:repeat(${p.width}, ${cellSize}px);gap:1px;background:#999;width:fit-content;margin:0 auto;border:1px solid #999;">`;
+    for (let r = 0; r < p.height; r++) {
+      for (let c = 0; c < p.width; c++) {
+        const code = p.grid[`${c},${r}`];
+        const color = colorMap[code];
+        const hex = color ? color.hex : '#ccc';
+        const textColor = isLight(hex) ? '#333' : '#fff';
+        const label = showCode ? code : '';
+        gridHtml += `<div style="width:${cellSize}px;height:${cellSize}px;background:${hex};display:flex;align-items:center;justify-content:center;font-size:${cellSize <= 10 ? 0 : 7}px;font-weight:bold;color:${textColor};font-family:monospace;" title="${code || ''}">${label}</div>`;
+      }
+    }
+    gridHtml += '</div>';
+
+    // 色号对照表
+    const sortedColors = [...p.color_usage].sort((a, b) => b.count - a.count);
+    let tableHtml = '<table><thead><tr><th>色号</th><th>名称</th><th>色样</th><th>用量</th></tr></thead><tbody>';
+    for (const c of sortedColors) {
+      tableHtml += `<tr><td><b>${c.code}</b></td><td>${c.name}</td><td><span style="display:inline-block;width:18px;height:18px;background:${c.hex || '#ccc'};border-radius:4px;border:1px solid rgba(0,0,0,0.08);"></span></td><td>${c.count} 粒</td></tr>`;
+    }
+    tableHtml += '</tbody></table>';
+
+    document.getElementById('result-content').innerHTML = `
+      <div class="stats">
+        <div class="stat-box"><div class="label">名称</div><div class="value" style="font-size:18px;">${p.name}</div></div>
+        <div class="stat-box"><div class="label">品牌</div><div class="value" style="font-size:18px;">${p.brand}</div></div>
+        <div class="stat-box"><div class="label">尺寸</div><div class="value" style="font-size:18px;">${p.width}x${p.height}</div></div>
+        <div class="stat-box"><div class="label">总粒数</div><div class="value">${p.total_beads}</div></div>
+        <div class="stat-box"><div class="label">色号数</div><div class="value">${p.colors}</div></div>
+      </div>
+      <div style="margin-top:24px;">
+        <h3 style="font-size:16px;margin-bottom:12px;color:#444;">拼豆图案预览</h3>
+        ${gridHtml}
+      </div>
+      <div style="margin-top:24px;">
+        <h3 style="font-size:16px;margin-bottom:12px;color:#444;">色号对照表</h3>
+        ${tableHtml}
+      </div>
+      <div style="margin-top:24px;">
+        <h3 style="font-size:16px;margin-bottom:12px;color:#444;">原图与缩略图</h3>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:12px;color:#888;margin-bottom:4px;">原始大图</div>
+            <img src="/images/${p.id}.png" style="max-width:300px;max-height:300px;border-radius:8px;border:1px solid #ddd;object-fit:contain;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<div style=font-size:12px;color:#999;>大图未生成</div>';">
+          </div>
+          <div>
+            <div style="font-size:12px;color:#888;margin-bottom:4px;">缩略图</div>
+            <img src="/thumbnails/${p.id}.png" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid #ddd;object-fit:contain;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<div style=font-size:12px;color:#999;>缩略图未生成</div>';">
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    showMsg(data.error || '转换失败', false);
+  }
+}
+
+window.addEventListener('brandchange', () => {
+  const sel = document.getElementById('brand-select');
+  if (sel) sel.value = getCurrentBrand();
+});
+loadBrands();
+</script>
+{% endblock %}

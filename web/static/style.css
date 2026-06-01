@@ -1,0 +1,543 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f5f7fa;
+  color: #333;
+  line-height: 1.6;
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---------- 侧边栏 ---------- */
+.sidebar {
+  width: 220px;
+  background: #1a1d23;
+  color: #fff;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  padding: 24px 20px;
+  font-size: 18px;
+  font-weight: 700;
+  border-bottom: 1px solid #2a2f38;
+  letter-spacing: 0.5px;
+}
+
+.sidebar nav {
+  padding: 12px 0;
+}
+
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  color: #a0a8b8;
+  text-decoration: none;
+  font-size: 14px;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.sidebar nav a:hover {
+  background: #252a33;
+  color: #fff;
+}
+
+.sidebar nav a.active {
+  background: #252a33;
+  color: #fff;
+  border-left-color: #4f8cff;
+}
+
+.sidebar .icon {
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+/* ---------- 内容区 ---------- */
+.content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.content h1 {
+  font-size: 24px;
+  margin-bottom: 24px;
+  font-weight: 600;
+}
+
+/* ---------- 卡片 ---------- */
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.card h2 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: #444;
+}
+
+/* ---------- 表单 ---------- */
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 160px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #4f8cff;
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #4f8cff;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #3a78f0;
+}
+
+.btn-danger {
+  background: #ff4d4f;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #e04345;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* ---------- 表格 ---------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  font-weight: 600;
+  color: #666;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+tr:hover {
+  background: #fafbfc;
+}
+
+/* ---------- 色块 ---------- */
+.color-dot {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-right: 8px;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* ---------- 标签 ---------- */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tag-success {
+  background: #e6f7e6;
+  color: #2e7d32;
+}
+
+.tag-warning,
+.tag-warn {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.tag-info {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+/* ---------- 空状态 ---------- */
+.empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: #999;
+}
+
+.empty .icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ---------- 统计栏 ---------- */
+.stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-box {
+  flex: 1;
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.stat-box .label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.stat-box .value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+}
+
+/* ---------- 消息 ---------- */
+.message {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.message.success {
+  background: #e6f7e6;
+  color: #2e7d32;
+}
+
+.message.error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* ---------- 图案预览网格 ---------- */
+.pattern-preview {
+  display: grid;
+  gap: 1px;
+  background: #ddd;
+  border: 1px solid #ddd;
+  width: fit-content;
+  margin-top: 16px;
+}
+
+.pattern-preview .cell {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .sidebar nav {
+    display: flex;
+    padding: 0;
+  }
+  .sidebar nav a {
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+  .sidebar nav a.active {
+    border-left-color: transparent;
+    border-bottom-color: #4f8cff;
+  }
+  .content {
+    padding: 20px;
+  }
+  .stats {
+    flex-direction: column;
+  }
+}
+
+/* ---------- 图案卡片网格 ---------- */
+.pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.pattern-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+}
+
+.pattern-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.pattern-card:hover .pattern-card-img img {
+  transform: scale(1.03);
+}
+
+.pattern-card-img {
+  aspect-ratio: 4 / 3;
+  background: #f0f2f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.pattern-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transition: transform 0.2s;
+}
+
+.pattern-card-img.empty::before {
+  content: "🎨";
+  font-size: 32px;
+  opacity: 0.3;
+}
+
+.pattern-card-img.empty::after {
+  content: "暂无预览";
+  position: absolute;
+  bottom: 16px;
+  font-size: 12px;
+  color: #999;
+}
+
+.pattern-card-info {
+  padding: 14px 16px;
+  flex: 1;
+}
+
+.pattern-card-info .name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-card-info .meta {
+  font-size: 12px;
+  color: #888;
+}
+
+/* ---------- 详情弹窗（加大版） ---------- */
+.detail-modal-lg > div {
+  max-width: 900px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.detail-body {
+  display: flex;
+  gap: 24px;
+}
+
+.detail-left {
+  flex: 1.2;
+  min-width: 0;
+}
+
+.detail-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-left .big-image {
+  width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+  image-rendering: auto;
+  border-radius: 8px;
+  background: #f5f7fa;
+  cursor: zoom-in;
+}
+
+.detail-left .empty-image {
+  width: 100%;
+  height: 280px;
+  background: #f0f2f5;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.detail-left .empty-image::before {
+  content: "🎨";
+  font-size: 48px;
+  opacity: 0.3;
+  margin-bottom: 8px;
+}
+
+/* ---------- 色条图 ---------- */
+.color-bar-chart {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.color-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.color-bar:last-child {
+  margin-bottom: 0;
+}
+
+.color-bar-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+.color-bar-track {
+  flex: 1;
+  height: 20px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.color-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.color-bar-count {
+  font-weight: 600;
+  color: #333;
+  min-width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* 色号列表滚动 */
+.color-list-scroll {
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .pattern-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .detail-body {
+    flex-direction: column;
+  }
+
+  .detail-left .big-image {
+    max-height: 300px;
+  }
+
+  .color-list-scroll {
+    max-height: 300px;
+  }
+}

@@ -16,6 +16,20 @@
 - **拖拽上传**：GUI / Web 端均支持图片拖拽上传（兼容微信、文件管理器直接拖入）
 - **数据持久化**：SQLite 数据库，支持库存快照与制作历史
 
+## 界面预览
+
+| Web 首页 | 库存管理 |
+|:---:|:---:|
+| ![Web 首页](docs/screenshots/web_home.png) | ![库存管理](docs/screenshots/inventory.png) |
+
+| 图案库 | 图案转拼豆图 |
+|:---:|:---:|
+| ![图案库](docs/screenshots/图案库.png) | ![图案转拼豆图](docs/screenshots/图案转拼豆图.png) |
+
+| 手动录入图案 | 图案详情弹窗 |
+|:---:|:---:|
+| ![手动录入图案](docs/screenshots/手动录入图案.png) | ![图案详情弹窗](docs/screenshots/图案详情弹窗.png) |
+
 ## 项目结构
 
 ```
